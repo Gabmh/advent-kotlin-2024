@@ -1,8 +1,20 @@
 import kotlin.math.abs
 
-fun antinodes(a: Position, b: Position): List<Position> {
-    val xDiff = abs(a.x - b.x)
-    val yDiff = abs(a.y - b.y)
+private fun Position.inBordersOf(input: List<String>) = x in IntRange(0, input.first().lastIndex) && y in IntRange(0, input.lastIndex)
+
+private fun generateSignalMap(input: List<String>): Map<Char, List<Position>> {
+    val signalMap = mutableMapOf<Char, List<Position>>()
+    input.forEachIndexed { y, line ->
+        line.forEachIndexed { x, char ->
+            if (char != '.') signalMap[char] = Position(x, y).let { signalMap[char]?.plus(it) ?: listOf(it) }
+        }
+    }
+    return signalMap
+}
+
+private fun generateAntinodes(a: Position, b: Position, multiplier: Int = 1): List<Position> {
+    val xDiff = abs(a.x - b.x) * multiplier
+    val yDiff = abs(a.y - b.y) * multiplier
     return listOf(
         Position(
             x = if (a.x > b.x) a.x + xDiff else a.x - xDiff,
@@ -15,7 +27,17 @@ fun antinodes(a: Position, b: Position): List<Position> {
     )
 }
 
-fun List<Position>.display(input: List<String>) = input.toMutableList().let { newInput ->
+private fun generateAllAntinodes(a: Position, b: Position, input: List<String>): List<Position> {
+    var multiplier = 1
+    var antinodes = emptyList<Position>()
+    while (generateAntinodes(a, b, multiplier).any { antinode -> antinode.inBordersOf(input) }) {
+        antinodes += generateAntinodes(a, b, multiplier)
+        multiplier++
+    }
+    return antinodes
+}
+
+private fun List<Position>.displayAntinodes(input: List<String>) = input.toMutableList().let { newInput ->
     forEach { antinode ->
         newInput[antinode.y] = StringBuilder(newInput[antinode.y]).let { stringBuilder ->
             stringBuilder.setCharAt(antinode.x, '#')
@@ -26,31 +48,40 @@ fun List<Position>.display(input: List<String>) = input.toMutableList().let { ne
 }
 
 fun main () {
-    fun part1(input: List<String>): Int {
-        val signalMap = mutableMapOf<Char, List<Position>>()
-        input.mapIndexed { y, line ->
-            line.mapIndexed { x, char ->
-                if (char != '.') signalMap[char] = Position(x, y).let { signalMap[char]?.plus(it) ?: listOf(it) }
-            }
-        }
-        return signalMap.values
-            .flatMap { positions ->
-                positions.flatMap { a ->
-                    (positions - a).flatMap { b ->
-                        antinodes(a, b)
-                    }
+    fun part1(input: List<String>): Int = generateSignalMap(input).entries
+        .flatMap { (char, positions) ->
+            positions.flatMap { a ->
+                (positions - a).flatMap { b ->
+                    generateAntinodes(a, b)
+                        .filter { antinode ->
+                            antinode.inBordersOf(input) && input[antinode.y][antinode.x] != char
+                        }
                 }
             }
-            .filter { antinode ->
-                antinode.x in IntRange(0, input.first().lastIndex) && antinode.y in IntRange(0, input.lastIndex) && input[antinode.y][antinode.x] == '.'
+        }
+        .distinct()
+        .also { antinodes -> antinodes.displayAntinodes(input) }
+        .size
+
+    fun part2(input: List<String>) = generateSignalMap(input).values
+        .flatMap { positions ->
+            positions.flatMap { a ->
+                (positions - a).flatMap { b ->
+                    generateAllAntinodes(a, b, input)
+                        .filter { antinode ->
+                            antinode.inBordersOf(input)
+                        }
+                }
             }
-            .also { antinodes -> antinodes.display(input) }
-            .size
-    }
+        }
+        .distinct()
+        .also { antinodes -> antinodes.displayAntinodes(input) }
+        .size
 
-    fun part2(input: List<String>) = input.size
-
+    val test = readInput("test")
     val input = readInput("Day08")
+    part1(test).println()
     part1(input).println()
+    part2(test).println()
     part2(input).println()
 }
